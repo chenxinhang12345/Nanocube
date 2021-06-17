@@ -1,6 +1,9 @@
 package nanocube
 
-import "fmt"
+import (
+	"fmt"
+	"math"
+)
 
 /*
 Nanocube ...
@@ -16,7 +19,6 @@ type Nanocube struct {
 type SpatNode struct {
 	Bounds   Bounds
 	Children []*SpatNode
-	Summary  *Summary
 	CatRoot  *CatNode
 	Level    int //current level
 }
@@ -26,6 +28,12 @@ type CatNode struct {
 	Children []*Summary
 	Summary  *Summary
 	// Type     string //the category
+}
+
+//HeatMapGrid encode information for each grid of heatmap
+type HeatMapGrid struct {
+	b     Bounds
+	count int64
 }
 
 /*Bounds encode spatial information for each node
@@ -230,4 +238,123 @@ func (nc *Nanocube) AddObject(obj Object) {
 		currentNode = stack[i]
 		currentNode.UpdateSummary(obj, levels, nc)
 	}
+}
+
+//Intersect Decide whether these two bounds are interseted or not
+func (b1 *Bounds) Intersect(b2 Bounds) bool {
+	return !((b1.Lat-b1.Height >= b2.Lat) || (b2.Lat-b2.Height >= b1.Lat) || (b1.Lng+b1.Width <= b2.Lng) || (b2.Lng+b2.Width <= b1.Lng))
+}
+
+//Equal Decide whether these two bounds are equal
+func (b1 *Bounds) Equal(b2 Bounds) bool {
+	return b1.Lat == b2.Lat && b1.Lng == b2.Lng && b2.Width == b1.Width && b1.Height == b2.Height
+}
+
+//QueryAll return all the grids within current node at specifying level
+func QueryAll(s *SpatNode, level int) []HeatMapGrid {
+	if s == nil {
+		return []HeatMapGrid{}
+	}
+	s1 := s.Children[0]
+	s2 := s.Children[1]
+	s3 := s.Children[2]
+	s4 := s.Children[3]
+	if s.Level < level {
+		c1 := QueryAll(s1, level)
+		c2 := QueryAll(s2, level)
+		c3 := QueryAll(s3, level)
+		c4 := QueryAll(s4, level)
+		res := append(c1, c2...)
+		res = append(res, c3...)
+		res = append(res, c4...)
+		return res
+	}
+	return []HeatMapGrid{HeatMapGrid{s.Bounds, s.CatRoot.Summary.Count}}
+
+}
+
+//Query basic function for query a heatmap without specifying type
+func Query(s *SpatNode, b Bounds, level int) []HeatMapGrid {
+	fmt.Println("check if current node is null", s == nil)
+	s1 := s.Children[0]
+	s2 := s.Children[1]
+	s3 := s.Children[2]
+	s4 := s.Children[3]
+	c1 := []HeatMapGrid{}
+	c2 := []HeatMapGrid{}
+	c3 := []HeatMapGrid{}
+	c4 := []HeatMapGrid{}
+	if s.Level < level {
+		if s1 != nil {
+			b1 := s1.Bounds
+			x := b.Lng
+			y := b.Lat
+			if x < b1.Lng+b1.Width && y > b1.Lat-b1.Height { //Intersect
+				if (x == b1.Lng) && (y == b1.Lat) { //equal
+					c1 = QueryAll(s1, level)
+				} else {
+					w := math.Min(b1.Lng+b1.Width-x, b.Width)
+					h := math.Min(y-(b1.Lat-b1.Height), b.Height)
+					x1 := b.Lng
+					y1 := b.Lat
+					c1 = Query(s1, Bounds{x1, y1, w, h}, level)
+				}
+			}
+		}
+		if s2 != nil {
+			b1 := s2.Bounds
+			x := b.Lng + b.Width
+			y := b.Lat
+			if x > b1.Lng && y > b1.Lat-b1.Height { //Intersect
+				if (x == b1.Lat+b1.Width) && (y == b1.Lat) { //equal
+					c2 = QueryAll(s2, level)
+				} else {
+					w := math.Min(x-b1.Lng, b.Width)
+					h := math.Min(y-(b1.Lat-b1.Height), b.Height)
+					x1 := b.Lng - w
+					y1 := b.Lat
+					c2 = Query(s2, Bounds{x1, y1, w, h}, level)
+				}
+			}
+		}
+		if s3 != nil {
+			b1 := s3.Bounds
+			x := b.Lng
+			y := b.Lat - b.Height
+			if x < b1.Lng+b1.Width && y < b1.Lat { //Intersect
+				if (x == b1.Lng) && (y == b1.Lat-b1.Height) { //equal
+					c3 = QueryAll(s3, level)
+				} else {
+					w := math.Min(b1.Lng+b1.Width-x, b.Width)
+					h := math.Min(b1.Lat-y, b.Height)
+					x1 := x
+					y1 := y + h
+					c3 = Query(s3, Bounds{x1, y1, w, h}, level)
+				}
+			}
+		}
+		if s4 != nil {
+			b1 := s4.Bounds
+			x := b.Lng + b.Width
+			y := b.Lat - b.Height
+			if x > b1.Lng && y < b.Lat {
+				if (x == b1.Lng+b1.Width) && (y == b1.Lat-b1.Height) {
+					c4 = QueryAll(s4, level)
+				} else {
+					w := math.Min(x-b1.Lng, b.Width)
+					h := math.Min(b1.Lat-y, b.Height)
+					x1 := x - w
+					y1 := y + h
+					c4 = Query(s4, Bounds{x1, y1, w, h}, level)
+				}
+			}
+		}
+		res := append(c1, c2...)
+		res = append(res, c3...)
+		res = append(res, c4...)
+		return res
+
+	}
+	return []HeatMapGrid{HeatMapGrid{s.Bounds, s.CatRoot.Summary.Count}}
+
 }
