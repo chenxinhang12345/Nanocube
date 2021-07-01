@@ -1,7 +1,6 @@
 package nanocube
 
 import (
-	"fmt"
 	"math"
 )
 
@@ -101,7 +100,6 @@ func (nc *Nanocube) getIndex(t string) int {
 
 //HasOnlyOneChild check if the SpatNode has only one child
 func (s *SpatNode) HasOnlyOneChild() (bool, *SpatNode) {
-	fmt.Println("debug hasonlyonechild:", s.Children)
 	counter := 0
 	var retptr *SpatNode = nil
 	for i := 0; i < 4; i++ {
@@ -110,7 +108,6 @@ func (s *SpatNode) HasOnlyOneChild() (bool, *SpatNode) {
 			counter++
 		}
 	}
-	fmt.Println(counter)
 	return (counter == 1), retptr
 }
 
@@ -160,7 +157,6 @@ func (c *CatNode) HasOnlyOneChild() bool {
 //UpdateSummary update current summary when adding an object to current SpatNode
 func (s *SpatNode) UpdateSummary(obj Object, maxLevel int, nc *Nanocube) {
 	hasOnlyOneChild, child := s.HasOnlyOneChild()
-	fmt.Println(hasOnlyOneChild)
 	if s.Level < maxLevel {
 		if s.CatRoot == nil { //if it doesn't have categorical root
 			s.CatRoot = child.CatRoot
@@ -168,7 +164,6 @@ func (s *SpatNode) UpdateSummary(obj Object, maxLevel int, nc *Nanocube) {
 			if hasOnlyOneChild { //only one child
 				s.CatRoot = child.CatRoot
 			} else { //need update
-				fmt.Println("debug: ", child.CatRoot.Children)
 				index := nc.getIndex(obj.Type) //update categorical node
 				cpy := make([]*Summary, len(s.CatRoot.Children))
 				copy(cpy, s.CatRoot.Children)
@@ -185,32 +180,27 @@ func (s *SpatNode) UpdateSummary(obj Object, maxLevel int, nc *Nanocube) {
 			}
 		}
 	} else {
-		// fmt.Println("leave node")
-		// fmt.Println("my cat ROOT:", s.CatRoot)
 		if s.CatRoot == nil {
-			// fmt.Println("no cat root")
 			s.CatRoot = &CatNode{Summary: &Summary{Count: 1}, Children: make([]*Summary, len(nc.Types))}
 			index := nc.getIndex(obj.Type)
 			s.CatRoot.Children[index] = s.CatRoot.Summary
-			// fmt.Println("my cat ROOT now:", s.CatRoot)
 		} else { //need update
 			index := nc.getIndex(obj.Type)
-			// fmt.Println("leave children:", s.CatRoot.Children)
 			if s.CatRoot.Children[index] != nil {
 				s.CatRoot.Children[index].Count++
 			} else {
-				// fmt.Println("insert new type")
 				s.CatRoot.Children[index] = &Summary{Count: 1}
 				for i := 0; i < len(s.CatRoot.Children); i++ {
 					if i != index {
-						s.CatRoot.Children[i] = s.CatRoot.Children[i].Copy() //deep copy
+						if s.CatRoot.Children[i] != nil {
+							s.CatRoot.Children[i] = s.CatRoot.Children[i].Copy() //deep copy
+						}
 					}
 				}
 				s.CatRoot.Summary.Count++
 			}
 		}
 	}
-	// fmt.Println(s)
 }
 
 //AddObject Add an object
@@ -275,7 +265,6 @@ func QueryAll(s *SpatNode, level int) []HeatMapGrid {
 
 //Query basic function for query a heatmap without specifying type
 func Query(s *SpatNode, b Bounds, level int) []HeatMapGrid {
-	fmt.Println("check if current node is null", s == nil)
 	s1 := s.Children[0]
 	s2 := s.Children[1]
 	s3 := s.Children[2]

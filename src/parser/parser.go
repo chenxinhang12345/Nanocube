@@ -2,7 +2,9 @@ package parser
 
 import (
 	"encoding/csv"
+	"fmt"
 	"log"
+	"math"
 	"os"
 	"strconv"
 
@@ -65,5 +67,41 @@ func ParseObjects(filename string, typeHead string) []nc.Object {
 		ty := records[i][TypeIndex]
 		res = append(res, nc.Object{Lng: lng, Lat: lat, Type: ty})
 	}
+	return res
+}
+
+//CreateNanoCubeFromCsvFile return a nanocube pointer
+func CreateNanoCubeFromCsvFile(filePath string, typeHead string, maxDepth int) *nc.Nanocube {
+	objects := ParseObjects(filePath, typeHead)
+	minLng := 1e9
+	maxLng := -1e9
+	minLat := 1e9
+	maxLat := -1e9
+	types := make(map[string]bool)
+	for i := 0; i < len(objects); i++ {
+		o := objects[i]
+		lng := o.Lng
+		lat := o.Lat
+		types[o.Type] = true
+		minLng = math.Min(minLng, lng)
+		maxLng = math.Max(maxLng, lng)
+		minLat = math.Min(minLat, lat)
+		maxLat = math.Max(maxLat, lat)
+	}
+	//top left corner minlng maxlat
+	fmt.Println("Top left corner: ", minLng, maxLat)
+	width := math.Abs(minLng - maxLng)
+	height := math.Abs(minLat - maxLat)
+	b := math.Max(width, height)
+	fmt.Println("boarder length: ", b)
+	typesArray := make([]string, 0)
+	for k := range types {
+		typesArray = append(typesArray, k)
+	}
+	res := nc.SetUpCube(maxDepth, nc.Bounds{Lng: minLng, Lat: maxLat, Width: b, Height: b}, typesArray)
+	for i := 0; i < len(objects); i++ {
+		res.AddObject(objects[i])
+	}
+	fmt.Println("Total number of objects: ", len(objects))
 	return res
 }
